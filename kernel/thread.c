@@ -1,5 +1,7 @@
 
 #include <thread.h>
+#include <kernel.h>
+#include <stddef.h>
 
 void flush_threads(kstate_t *);
 
@@ -12,6 +14,7 @@ void init_threading()
 
     ks->threadndx = 0x0;
     ks->iswitch = 1;
+    init_heap(ks);
 }
 
 void flush_threads(kstate_t *ks)

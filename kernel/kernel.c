@@ -1,8 +1,12 @@
 
-#include <kernel.h>
+#include <stddef.h>
+#include <thread.h>
+#include <inttype.h>
+#include <serial.h>
+#include <guarded.h>
+#include <stdio.h>
 
-#define KSTACKSTART 0x6000
-#define KSTACKEXC   0x8000
+#include <kernel.h>
 
 #define KEXP_TOPSWI \
 	uint32_t			lr; \
@@ -21,7 +25,13 @@
   asm("push {r0}"); \
 	asm("mov %[ps], lr" : [ps]"=r" (lr));
 
+#define KEXP_BOTSWI \
+  asm("pop {r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12}"); \
+	asm("LDM sp!, {pc}^");
+
 #define KEXP_BOT3 \
+  asm("pop {r0}");\
+  asm("msr spsr, r0");\
 	asm("pop {r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12}"); \
 	asm("LDM sp!, {pc}^");
 
@@ -59,17 +69,16 @@ void k_exphandler(uint32_t lr, uint32_t type)
     }
     else if(swi == 1)
     {
+      asm("mov r8, sp");
       __builtin_va_list *va;
       const char *fmt;
-      asm("mov r8, sp");
-      asm("mov r9, #0x300");
-      asm("ldm r9, {%0, %1}" : "=r"(fmt),"=r"(va));
-      asm("mov r9, pc");
-      asm("add r9, r9, #4");
+      asm("mov r6, #0x300");
+      asm("ldm r6, {%0, %1}" : "=r"(fmt),"=r"(va));
+      asm("mov r7, pc");
+      asm("add r7, r7, #4");
       _printf(fmt, va);
       asm("tohere:");
-      asm("mov sp, r1");
-      for(;;);
+      asm("mov sp, r8");
       return;
     }
   }
@@ -97,6 +106,9 @@ void k_exphandler(uint32_t lr, uint32_t type)
 			kt->r1 = ((uint32_t *)KSTACKEXC)[-13];
 			kt->r0 = ((uint32_t *)KSTACKEXC)[-14];
 			kt->cpsr = ((uint32_t *)KSTACKEXC)[-15];
+
+      printk("kt->lr:0x%x threadndx: 0x%x\n", kt->lr, ks->threadndx);
+
       asm("mrs r0, cpsr\n\
            bic r0, r0, #0x1f\n\
            orr r0, r0, #0x1f\n\
@@ -109,6 +121,7 @@ void k_exphandler(uint32_t lr, uint32_t type)
            " : [sp]"=r"(__sp), [lr]"=r"(__lr));
       kt->sp = __sp;
       kt->lr = __lr;
+      printk("<---threadndx:0x%x kt->sp:0x%x kt->pc:0x%x kt->lr:0x%x\n", ks->threadndx, kt->sp, kt->pc, kt->lr);
     }
 
     if(!ks->iswitch)
@@ -117,6 +130,8 @@ void k_exphandler(uint32_t lr, uint32_t type)
     }
     ks->iswitch = 0;
     kt = &ks->threads[ks->threadndx];
+    // for (int x = 0; x < 16; ++x)
+		// 	printk("stack[0x%x]:0x%x\n", x, ((uint32_t *)KSTACKEXC)[-x]);
     ((uint32_t *)KSTACKEXC)[-1] = kt->pc;
 		((uint32_t *)KSTACKEXC)[-2] = kt->r12;
  		((uint32_t *)KSTACKEXC)[-3] = kt->r11;
@@ -142,14 +157,14 @@ void k_exphandler(uint32_t lr, uint32_t type)
          orr r0, r0, #0x12\n\
          msr cpsr, r0\n\
          " :: [sp]"r"(kt->sp), [lr]"r"(kt->lr));
+    printk("--->threadndx:0x%x kt->sp:0x%x kt->pc:0x%x kt->lr:0x%x\n", ks->threadndx, kt->sp, kt->pc, kt->lr);
     return;
   }
 
   if(type != IVT_IRQ && type != IVT_FIQ && type != IVT_SWINT)
   {
-    // trap
-    serial_putc('!');
-    for(;;);
+    // // trap
+    // for(;;);
   }
   return;
 }
@@ -160,7 +175,7 @@ void __attribute__((naked)) k_exphandler_reset_entry() { KEXP_TOP3; k_exphandler
 void __attribute__((naked)) k_exphandler_undef_entry() { KEXP_TOP3; k_exphandler(lr, IVT_UNDEF); KEXP_BOT3; }
 void __attribute__((naked)) k_exphandler_abrtp_entry() { KEXP_TOP3; k_exphandler(lr, IVT_ABRTP); KEXP_BOT3; }
 void __attribute__((naked)) k_exphandler_abrtd_entry() { KEXP_TOP3; k_exphandler(lr, IVT_ABRTD); KEXP_BOT3; }
-void __attribute__((naked)) k_exphandler_swi_entry() { KEXP_TOPSWI; k_exphandler(lr, IVT_SWINT); KEXP_BOT3; }
+void __attribute__((naked)) k_exphandler_swi_entry() { KEXP_TOPSWI; k_exphandler(lr, IVT_SWINT); KEXP_BOTSWI; }
 
 void allocate_ivt_entry(uint8_t intr, void *addr)
 {
@@ -196,7 +211,7 @@ void sample_thread_1()
 {
   for(;;)
   {
-    delay(1000);
+    delay(10000);
     printf("Thread 1\n");
   }
 }
@@ -205,11 +220,18 @@ void sample_thread_2()
 {
   for(;;)
   {
-    delay(500);
+    printf("More stuff from thread2\n");
     printf("Thread 2\n");
   }
 }
 
+void debugger()
+{
+  char c;
+  while( (c = serial_getc()) != '\r' );
+  printk("(enter) ");
+  serial_putc('\n');
+}
 
 void kmain(uint32_t r0, uint32_t r1, uint32_t atags)
 {
@@ -243,8 +265,7 @@ void kmain(uint32_t r0, uint32_t r1, uint32_t atags)
 
   init_guarded();
 
-  printf("Hello world\n");
-  printf("Hello world\n");
+  debugger();
 
   picmmio = (uint32_t *)0x14000000;
   picmmio[PIC_IRQ_ENABLESET] = (1 << 5) | (1 << 6) | (1 << 7);

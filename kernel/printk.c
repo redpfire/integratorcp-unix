@@ -1,5 +1,6 @@
 
 #include <kernel.h>
+#include <serial.h>
 
 static char* itoh(int i, char *buf)
 {
@@ -24,7 +25,7 @@ static char* itoh(int i, char *buf)
 	return buf;
 }
 
-void kprintf(const char *fmt, ...)
+void printk(const char *fmt, ...)
 {
     const char *p;
     char buf[1024] = {0};
@@ -44,12 +45,10 @@ void kprintf(const char *fmt, ...)
             switch(*++p)
             {
                 case 'n':
-                    buf[x] = '\n';
-                    ++x;
+                    buf[x++] = '\n';
                     break;
                 case 'r':
-                    buf[x] = '\r';
-                    ++x;
+                    buf[x++] = '\r';
                     break;
                 default:
                     break;
@@ -59,23 +58,20 @@ void kprintf(const char *fmt, ...)
 
         if(*p != '%')
         {
-            buf[x] = *p;
-            ++x;
+            buf[x++] = *p;
             continue;
         }
         switch(*++p)
         {
             case 'c':
                 i = __builtin_va_arg(argp, int);
-                buf[x] = i;
-                ++x;
+                buf[x++] = i;
                 break;
             case 's':
                 s = __builtin_va_arg(argp, char *);
                 for(y = 0; s[y]; ++y)
                 {
-                    buf[x] = s[y];
-                    ++x;
+                    buf[x++] = s[y];
                 }
                 break;
             case 'x':
@@ -83,13 +79,11 @@ void kprintf(const char *fmt, ...)
                 s = itoh(i, fmtbuf);
                 for(y = 0; s[y]; ++y)
                 {
-                    buf[x] = s[y];
-                    ++x;
+                    buf[x++] = s[y];
                 }
                 break;
             case '%':
-                buf[x] = '%';
-                ++x;
+                buf[x++] = '%';
                 break;
         }
     }

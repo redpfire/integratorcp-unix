@@ -16,3 +16,11 @@ void serial_puts(const char *s)
     serial_putc(s[i]);
   }
 }
+
+char serial_getc()
+{
+  while(*(volatile uint32_t *)(SERIAL_BASE + SERIAL_FLAG_REGISTER) & SERIAL_RX_EMPTY);
+  uint32_t t;
+  t = *(volatile uint32_t *) SERIAL_BASE;
+  return t & 0xFF;
+}

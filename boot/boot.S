@@ -12,7 +12,7 @@
 // preserve these registers as argument for kernel_main
 
 _start:
-  mov sp, #0x6000
+  mov sp, #0x2000
 
   // clear out bss
   ldr r4, =__bss_start
