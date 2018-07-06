@@ -2,7 +2,6 @@
 .section ".text.boot"
 
 .globl _start
-.globl aivte
 
 // Entry point for the kernel.
 // r15 -> should begin execution at 0x8000.

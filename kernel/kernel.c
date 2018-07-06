@@ -5,6 +5,7 @@
 #include <serial.h>
 #include <guarded.h>
 #include <stdio.h>
+#include <mem.h>
 
 #include <kernel.h>
 
@@ -90,6 +91,8 @@ void k_exphandler(uint32_t lr, uint32_t type)
     t0mmio[REG_CTRL] = t0mmio[REG_CTRL] | CTRL_ENABLE;
     if(!ks->iswitch)
     {
+      arm_tlbset1((uint32_t)ks->vmmk.table); // switch back to kernel table
+      asm("mcr p15, #0, r0, c8, c7, #0");
       kt = &ks->threads[ks->threadndx];
       kt->pc = ((uint32_t *)KSTACKEXC)[-1];
 			kt->r12 = ((uint32_t *)KSTACKEXC)[-2];
@@ -157,14 +160,19 @@ void k_exphandler(uint32_t lr, uint32_t type)
          orr r0, r0, #0x12\n\
          msr cpsr, r0\n\
          " :: [sp]"r"(kt->sp), [lr]"r"(kt->lr));
-    printk("--->threadndx:0x%x kt->sp:0x%x kt->pc:0x%x kt->lr:0x%x\n", ks->threadndx, kt->sp, kt->pc, kt->lr);
+    arm_tlbset1((uint32_t) kt->vmm.table);
+    asm("mcr p15, #0, r0, c8, c7, #0");
+    uint32_t phy;
+    kvmm_getphy(kt->vmm, 0x80000000, &phy);
+    printk("--->threadndx:0x%x kt->sp:0x%x kt->pc:0x%x kt->lr:0x%x real:%x\n", ks->threadndx, kt->sp, kt->pc, kt->lr, phy);
     return;
   }
 
   if(type != IVT_IRQ && type != IVT_FIQ && type != IVT_SWINT)
   {
-    // // trap
-    // for(;;);
+    printk("Trap! %x", type);
+    // trap
+    for(;;);
   }
   return;
 }
@@ -211,8 +219,10 @@ void sample_thread_1()
 {
   for(;;)
   {
-    delay(10000);
-    printf("Thread 1\n");
+    uint32_t a = 0xa0000000;
+    asm("mov r0, #0x41");
+    asm("mov r1, %0" :: "r"(a));
+    asm("str r0, [r1]");
   }
 }
 
@@ -220,16 +230,18 @@ void sample_thread_2()
 {
   for(;;)
   {
-    printf("More stuff from thread2\n");
-    printf("Thread 2\n");
+    uint32_t a = 0xa0000000;
+    asm("mov r0, #0x42");
+    asm("mov r1, %0" :: "r"(a));
+    asm("str r0, [r1]");
   }
 }
 
 void debugger()
 {
   char c;
-  while( (c = serial_getc()) != '\r' );
   printk("(enter) ");
+  while( (c = serial_getc()) != '\r' );
   serial_putc('\n');
 }
 
@@ -243,7 +255,12 @@ void kmain(uint32_t r0, uint32_t r1, uint32_t atags)
   uint32_t *t0mmio;
   uint32_t *picmmio;
 
-  serial_puts("Hello world from kernel!\n");
+  printk("Opening a portal to narnia.\n");
+  //arm_cpsrset(arm_cpsrget() & ~(1 << 6));
+
+  init_threading();
+
+  debugger();
 
   allocate_ivt_entry(IVT_RESET, &k_exphandler_reset_entry); // 0x0
   allocate_ivt_entry(IVT_UNDEF, &k_exphandler_undef_entry); // 0x4
@@ -253,26 +270,21 @@ void kmain(uint32_t r0, uint32_t r1, uint32_t atags)
   allocate_ivt_entry(IVT_IRQ, &k_exphandler_irq_entry);     // 0x14
   allocate_ivt_entry(IVT_FIQ, &k_exphandler_fiq_entry);     // 0x18
 
-  serial_putc('Z');
+  printk("[IRQ] Allocated all entries.\n");
 
-  arm_cpsrset(arm_cpsrget() & ~(1 << 7)); // enable IRQ
-  //arm_cpsrset(arm_cpsrget() & ~(1 << 6));
-
-  init_threading();
-
-  create_thread(&sample_thread_1, 0x100000, 0x110000);
-  create_thread(&sample_thread_2, 0x130000, 0x140000);
+  create_thread(&sample_thread_1);
+  create_thread(&sample_thread_2);
 
   init_guarded();
 
-  debugger();
+  arm_cpsrset(arm_cpsrget() & ~(1 << 7)); // enable IRQ
 
   picmmio = (uint32_t *)0x14000000;
   picmmio[PIC_IRQ_ENABLESET] = (1 << 5) | (1 << 6) | (1 << 7);
 
   t0mmio = (uint32_t *)0x13000000;
-  t0mmio[REG_LOAD] = 0xffffff;
-  t0mmio[REG_BGLOAD] = 0xffffff;
+  t0mmio[REG_LOAD] = 0x0fffff;
+  t0mmio[REG_BGLOAD] = 0x0fffff;
   t0mmio[REG_CTRL] = CTRL_ENABLE | CTRL_MODE_PERIODIC | CTRL_SIZE_32 | CTRL_DIV_NONE | CTRL_INT_ENABLE;
   t0mmio[REG_INTCLR] = ~0;
 

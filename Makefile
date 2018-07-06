@@ -20,7 +20,8 @@ debug_c:
 	$(CC) -Ikernel/inc -g -Wall -O2 -nostdlib -nostartfiles -ffreestanding -std=gnu99 -c kernel/*.c
 
 link:
-	$(LD) -T link.ld -L/usr/lib/gcc/arm-none-eabi/5.4.1 -lgcc -o build/arm.elf *.o
+	#$(LD) -T link.ld -o build/arm.elf *.o
+	$(CC) -nostartfiles -ffreestanding -Xlinker --script=./link.ld -lgcc -o build/arm.elf  *.o
 	$(OBJCOPY) -O binary build/arm.elf build/arm.bin
 
 debug: clean debug_c link

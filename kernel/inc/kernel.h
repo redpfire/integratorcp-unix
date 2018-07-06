@@ -22,6 +22,7 @@
 	This is the maximum amount of virtual memory per kernel space.
 */
 #define KMEMINDEX 3
+#define ENTRIES 512
 #define KMEMSIZE (0x1000000 << (8 - KMEMINDEX))
 // physical memory page size
 #define KPHYPAGESIZE 4096

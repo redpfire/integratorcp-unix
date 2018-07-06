@@ -3,14 +3,8 @@
 #include <stddef.h>
 #include <inttype.h>
 #include <mem.h>
-#include <tlb.h>
+#include <kvmm.h>
 #include <serial.h>
-
-#define KVMM_SUCCESS		1
-#define KVMM_FAILURE		0
-#define KVMM_UNMAP			0x80000000
-#define KVMM_USER			0x40000000
-#define KVMM_KERNEL			0x20000000
  
 /*
 	kernel kernel page alloc

@@ -1,46 +1,48 @@
 
 #include <paging.h>
 #include <kernel.h>
-#include <tlb.h>
+#include <kvmm.h>
+
+extern int __start;
+extern int __end;
 
 void init_paging(kstate_t *ks)
 {
-    uint32_t *ktlb;
-    uint32_t *utlb;
     int x;
-    uint32_t *a;
-    uint32_t *b;
-    ktlb = k_heapBMAllocBound(&ks->hphy, 1024 * 16, 14);
-    utlb = k_heapBMAllocBound(&ks->hphy, 1024 * 16, 14);
+    // ktlb = k_heapBMAllocBound(&ks->hphy, 1024 * 16, 14);
+    //utlb = k_heapBMAllocBound(&ks->hphy, 1024 * 16, 14);
 
-    arm_tlbsetmode(1);
+    arm_tlbsetmode(KMEMINDEX);
 
-    for(x = 0 ; x < 2048; ++x)
-        ktlb[x] = (x << 2) | TLB_AP_PRIVACCESS | TLB_SECTION;
+    // for(x = 0 ; x < ENTRIES; ++x)
+    //     ktlb[x] = (x << 20) | TLB_AP_PRIVACCESS | TLB_SECTION;
     
-    utlb[0x800] = (1 << 20) | TLB_AP_PRIVACCESS | TLB_SECTION;
-    utlb[0x801] = (1 << 20) | TLB_AP_PRIVACCESS | TLB_SECTION;
-    ktlb[1] = (2 << 20) | TLB_AP_PRIVACCESS | TLB_SECTION;
-    ktlb[2] = (2 << 20) | TLB_AP_PRIVACCESS | TLB_SECTION;
+    // utlb[0x800] = (1 << 20) | TLB_AP_PRIVACCESS | TLB_SECTION;
+    // utlb[0x801] = (1 << 20) | TLB_AP_PRIVACCESS | TLB_SECTION;
+    // ktlb[1] = (2 << 20) | TLB_AP_PRIVACCESS | TLB_SECTION;
+    // ktlb[2] = (2 << 20) | TLB_AP_PRIVACCESS | TLB_SECTION;
+
+    debugger();
+
+    kvmm_init(&ks->vmmk);
+    for(x = 0 ;x < (KRAMADDR >> 20); ++x)
+        ks->vmmk.table[x] = (x << 20) | TLB_AP_PRIVACCESS | TLB_SECTION;
+    kvmm_map(ks->vmmk, (uint32_t)&__start, (uint32_t)&__start, (uint32_t)&__end - (uint32_t)&__start, TLB_C_AP_PRIVACCESS);
+    kvmm_map(ks->vmmk, 0, 0, 1, TLB_C_AP_PRIVACCESS);
+    kvmm_map(ks->vmmk, 0x16000000, 0x16000000, 1, TLB_C_AP_PRIVACCESS);
+    kvmm_map(ks->vmmk, 0x13000000, 0x13000000, 1, TLB_C_AP_PRIVACCESS);
+    kvmm_map(ks->vmmk, 0x14000000, 0x14000000, 1, TLB_C_AP_PRIVACCESS);
+
+    arm_tlbset0((uint32_t)ks->vmmk.table);
+    arm_tlbset1((uint32_t)ks->vmmk.table);
 
     printk("OK\n");
 
-    arm_tlbset1((uint32_t)utlb);
-    arm_tlbset0((uint32_t)ktlb);
+    //arm_tlbset1((uint32_t)utlb);
+    // arm_tlbset0((uint32_t)ktlb);
     arm_tlbsetdom(0x55555555);
     arm_tlbsetctrl(arm_tlbgetctrl() | 0x800001);
-
-    printk("OK2\n");
-
-    a = (uint32_t *)0x80000000;
-    b = (uint32_t *)0x80100000;
-    a[0] = 0x12345678;
-    printk("utlb: 0x%x\n", b[0]);
-
-    a = (uint32_t *)0x100000;
-    b = (uint32_t *)0x200000;
-    a[0] = 0x87654321;
-    printk("ktlb: 0x%x\n", b[0]);
     
-    printk("paging on!\n");
+    printk("[PTL] Paging enabled!\n");
+
 }

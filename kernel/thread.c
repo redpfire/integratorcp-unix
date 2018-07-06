@@ -2,6 +2,8 @@
 #include <thread.h>
 #include <kernel.h>
 #include <stddef.h>
+#include <mem.h>
+#include <kvmm.h>
 
 void flush_threads(kstate_t *);
 
@@ -30,7 +32,7 @@ uint8_t getcurrentthread()
     return ks->threadndx;
 }
 
-void create_thread(void *addr, uint32_t sp, uint32_t ksp)
+void create_thread(void *addr) // TODO: redo threads
 {
     kstate_t *ks;
     ks = (kstate_t *) KSTATEADDR;
@@ -50,7 +52,18 @@ void create_thread(void *addr, uint32_t sp, uint32_t ksp)
     }
     ks->threads[curr].valid = 1;
     ks->threads[curr].cpsr = 0x60000000 | ARM_MODE_USER;
-    ks->threads[curr].sp = sp;
-    ks->threads[curr].ksp = ksp;
-    ks->threads[curr].pc = (uint32_t)addr;
+    ks->threads[curr].sp = 0x90001000;
+    ks->threads[curr].pc = 0x80000000;
+
+    kvmm_init(&ks->threads[curr].vmm);
+    kvmm_allocregion(ks->threads[curr].vmm, 0x80000000, 1, KVMM_USER | TLB_C_AP_FULLACCESS);
+    kvmm_allocregion(ks->threads[curr].vmm, 0x90000000, 1, KVMM_USER | TLB_C_AP_FULLACCESS);
+
+    // for testing purposes
+    uint32_t page;
+    kvmm_map(ks->threads[curr].vmm, 0xa0000000, 0x16000000, 1, TLB_C_AP_FULLACCESS);
+    kvmm_getphy(ks->threads[curr].vmm, 0x80000000, &page);
+    int x;
+    for(x = 0; x < 24; ++x)
+        ((uint32_t *)page)[x] = ((uint32_t *)addr)[x];
 }

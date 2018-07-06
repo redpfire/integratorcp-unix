@@ -27,7 +27,8 @@ typedef struct
 typedef struct
 {
     uint8_t valid;
-    uint32_t r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, sp, ksp, lr, cpsr, pc;
+    uint32_t r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, sp, lr, cpsr, pc;
+    k_vmm_t vmm;
 } thread_t;
 
 typedef struct
@@ -38,6 +39,7 @@ typedef struct
     k_heapbm_t hphy; // physical page heap
     k_heapbm_t hchk; // data chunk heap
     k_heapbm_t husr;
+    k_vmm_t vmmk;
 } kstate_t;
 
 void k_heapBMInit(k_heapbm_t *heap);

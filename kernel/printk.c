@@ -15,7 +15,7 @@ static char* itoh(int i, char *buf)
 	if (sizeof(void*) == 8)
 		s = 16;
  
-	for (z = 0, n = 8; n > -1; --n)
+	for (z = 0, n = 7; n > -1; --n)
 	{
 		b = (i >> (n * 4)) & 0xf;
 		buf[z] = itoh_map[b];

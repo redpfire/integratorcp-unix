@@ -209,7 +209,6 @@ void init_heap(kstate_t *ks)
     uint8_t *bm;
     k_heapBMInit(&ks->hphy);
     k_heapBMInit(&ks->hchk);
-    k_heapBMInit(&ks->husr);
 
     k_heapBMAddBlock(&ks->hchk, KRAMADDR, sizeof(kstate_t), 5);
 
@@ -219,23 +218,17 @@ void init_heap(kstate_t *ks)
     k_heapBMSet(&ks->hchk, KSTACKSTART - 0x1000, 0x1000, 6);
     k_heapBMSet(&ks->hchk, KSTACKEXC - 0x1000, 0x1000, 7);
 
-    if(KRAMSIZE > KMEMSIZE)
-    {
-        // hphy is lower memory for kernel
-        bm = (uint8_t *)k_heapBMAlloc(&ks->hchk, k_heapBMGetBMSize(KMEMSIZE - KRAMADDR, KPHYPAGESIZE));
-        k_heapBMAddBlockEx(&ks->hphy, KRAMADDR, KMEMSIZE - KRAMADDR, KPHYPAGESIZE, (k_heapblockbm_t *)k_heapBMAlloc(&ks->hchk, sizeof(k_heapblockbm_t)), bm ,0);
+    bm = (uint8_t *)k_heapBMAlloc(&ks->hchk, k_heapBMGetBMSize(KRAMSIZE - KRAMADDR, KPHYPAGESIZE));
+    k_heapBMAddBlockEx(&ks->hphy, KRAMADDR, KRAMSIZE - KRAMADDR, KPHYPAGESIZE, (k_heapblockbm_t *)k_heapBMAlloc(&ks->hchk, sizeof(k_heapblockbm_t)), bm ,0);
 
-        bm = (uint8_t *)k_heapBMAlloc(&ks->hchk, k_heapBMGetBMSize(KRAMSIZE - KMEMSIZE, KPHYPAGESIZE));
-        k_heapBMAddBlockEx(&ks->hphy, KRAMADDR, KRAMSIZE - KRAMADDR, KPHYPAGESIZE, (k_heapblockbm_t *)k_heapBMAlloc(&ks->hchk, sizeof(k_heapblockbm_t)), bm, 0);
-    }
-    else
-    {
-        bm = (uint8_t *)k_heapBMAlloc(&ks->hchk, k_heapBMGetBMSize(KRAMSIZE - KRAMADDR, KPHYPAGESIZE));
-        k_heapBMAddBlockEx(&ks->hphy, KRAMADDR, KRAMSIZE - KRAMADDR, KPHYPAGESIZE, (k_heapblockbm_t *)k_heapBMAlloc(&ks->hchk, sizeof(k_heapblockbm_t)), bm ,0);
-    }
+    // map out kernel image
 
     k_heapBMSet(&ks->hphy, (uint32_t)&__start, (uint32_t)&__end - (uint32_t)&__start, 8);
     k_heapBMSet(&ks->hchk, (uint32_t)&__start, (uint32_t)&__end - (uint32_t)&__start, 8);
-    k_heapBMSet(&ks->husr, (uint32_t)&__start, (uint32_t)&__end - (uint32_t)&__start, 8);
+
+    // map out interrupt table
+
+    k_heapBMSet(&ks->hphy, 0x0, 0x1C, 9);
+    k_heapBMSet(&ks->hchk, 0x0, 0x1C, 9);
     init_paging(ks);
 }
