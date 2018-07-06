@@ -1,5 +1,5 @@
 
-.section ".text.boot"
+.section ".text.kickstart"
 
 .globl _start
 

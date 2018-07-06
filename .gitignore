@@ -1,7 +1,7 @@
 
-*.o
-*.bin
-*.elf
-*~
+*/*.o
+*/*.bin
+*/*.elf
+*/*~
 .vscode
 *.out

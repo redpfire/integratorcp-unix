@@ -3,14 +3,13 @@ ENTRY(_start)
 
 SECTIONS
 {
-
-  . = 0x10000; /* 0x8000 for the real hardware! */
+  . = 0x10000; 
   __start = .;
   __text_start = .;
 
   .text :
   {
-    KEEP(*(.text.boot))
+    KEEP(*(.text.kickstart))
     *(.text)
   }
   . = ALIGN(4096); /* align to page size */

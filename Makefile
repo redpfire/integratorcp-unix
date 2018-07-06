@@ -6,22 +6,21 @@ QEMU = qemu-system-arm
 GDB = arm-none-eabi-gdb
 RADARE2 = r2
 
+OBJECTS = kernel/*.o
+
 all: clean obj link
 
 init:
 	mkdir -p build
 
 obj:
-	$(CC) -ffreestanding -c boot/*.S
-	$(CC) -Ikernel/inc -Wall -O2 -nostdlib -nostartfiles -ffreestanding -std=gnu99 -c kernel/*.c
+	make -C kernel
 
 debug_c:
-	$(CC) -g -ffreestanding -c boot/*.S
-	$(CC) -Ikernel/inc -g -Wall -O2 -nostdlib -nostartfiles -ffreestanding -std=gnu99 -c kernel/*.c
+	make -C kernel debug
 
 link:
-	#$(LD) -T link.ld -o build/arm.elf *.o
-	$(CC) -nostartfiles -ffreestanding -Xlinker --script=./link.ld -lgcc -o build/arm.elf  *.o
+	$(CC) -nostartfiles -ffreestanding -Xlinker --script=./link.ld -lgcc -o build/arm.elf $(OBJECTS)
 	$(OBJCOPY) -O binary build/arm.elf build/arm.bin
 
 debug: clean debug_c link
@@ -40,4 +39,4 @@ r2:
 
 clean:
 	rm -f build/*
-	rm -f *.o
+	rm -f $(OBJECTS)
